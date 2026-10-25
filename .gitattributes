@@ -1,2 +1,1638 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Legal Document Creator — Executive Edition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- PDF.js for reading uploaded PDFs & html2pdf.js for exporting PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        :root {
+            --active-accent: #38bdf8;
+            --active-part: #0284c7;
+            --active-bg: #0f1d3a;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #070b14;
+            color: #f8fafc;
+        }
+
+        #app {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 70% 50%, #0f172a 0%, #060911 100%);
+            transition: background 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        /* Subtle Luxury Ambient Noise/Grid Overlay */
+        #app::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+            background-size: 32px 32px;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* --- TOP-RIGHT EXECUTIVE AI DROPDOWN & SOUND TOGGLE --- */
+        .top-right-controls {
+            position: absolute;
+            top: 26px;
+            right: 36px;
+            z-index: 30;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .sound-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            background: rgba(15, 23, 42, 0.65);
+            color: #e2e8f0;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+            cursor: pointer;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.25s ease;
+        }
+
+        .sound-btn:hover {
+            border-color: rgba(255, 255, 255, 0.35);
+            background: rgba(30, 41, 59, 0.85);
+            transform: translateY(-1px);
+        }
+
+        .ai-dropdown {
+            position: relative;
+        }
+
+        .ai-trigger-btn {
+            background: rgba(15, 23, 42, 0.65);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 30px;
+            padding: 9px 18px;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 0.4px;
+            color: #f1f5f9;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+            transition: all 0.25s ease;
+        }
+
+        .ai-trigger-btn:hover {
+            border-color: rgba(255, 255, 255, 0.35);
+            background: rgba(30, 41, 59, 0.85);
+        }
+
+        .ai-dropdown-menu {
+            position: absolute;
+            top: calc(100% + 10px);
+            right: 0;
+            width: 190px;
+            background: rgba(13, 18, 30, 0.95);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 14px;
+            padding: 6px;
+            box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6);
+            display: none;
+            flex-direction: column;
+            gap: 4px;
+            transform-origin: top right;
+            animation: fadeInMenu 0.18s ease-out;
+        }
+
+        @keyframes fadeInMenu {
+            from { opacity: 0; transform: scale(0.95) translateY(-4px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        .ai-dropdown-menu.show {
+            display: flex;
+        }
+
+        .ai-option {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 9px 12px;
+            border-radius: 9px;
+            border: none;
+            background: transparent;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: #cbd5e1;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.2s;
+        }
+
+        .ai-option:hover {
+            background: rgba(255, 255, 255, 0.07);
+            color: #fff;
+        }
+
+        .ai-option.active {
+            background: rgba(255, 255, 255, 0.12);
+            color: #ffffff;
+            font-weight: 600;
+        }
+
+        .status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .status-fast { background-color: #10b981; box-shadow: 0 0 8px #10b981; }
+        .status-busy { background-color: #f59e0b; box-shadow: 0 0 8px #f59e0b; }
+
+        /* --- VOLUMETRIC CONICAL SPOTLIGHT BEAM --- */
+        .beam-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        /* --- EXECUTIVE CENTER CONTENT INSIDE BEAM --- */
+        .beam-content-wrapper {
+            position: absolute;
+            top: 50%;
+            left: 55%;
+            transform: translate(-50%, -50%);
+            z-index: 5;
+            width: 55vw;
+            max-width: 680px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            transition: opacity 0.28s ease, transform 0.28s ease;
+        }
+
+        .suite-tag {
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            color: #d4af37;
+            margin-bottom: 10px;
+            opacity: 0.9;
+            transition: color 0.4s ease;
+        }
+
+        .doc-title {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: clamp(2.4rem, 3.8vw, 3.4rem);
+            font-weight: 700;
+            color: #f8fafc;
+            margin: 0 0 24px 0;
+            letter-spacing: 0.8px;
+            line-height: 1.1;
+            text-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .create-now-btn {
+            padding: 11px 28px;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 0.82rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1.6px;
+            background: linear-gradient(135deg, #d4af37 0%, #aa7c11 100%);
+            color: #090d16;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            border-radius: 50px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+            transition: all 0.3s ease;
+        }
+
+        .create-now-btn:hover {
+            transform: translateY(-2px);
+            filter: brightness(1.12);
+            box-shadow: 0 14px 34px rgba(0, 0, 0, 0.6);
+        }
+
+        /* --- LEFT LUXURY SPINNING WHEEL --- */
+        .wheel-container {
+            position: absolute;
+            left: -520px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 840px;
+            height: 840px;
+            z-index: 10;
+            cursor: grab;
+        }
+
+        .wheel-container:active {
+            cursor: grabbing;
+        }
+
+        #wheel-svg {
+            width: 100%;
+            height: 100%;
+            overflow: visible;
+            filter: drop-shadow(18px 0px 40px rgba(0, 0, 0, 0.65));
+        }
+
+        .sector-path {
+            stroke: rgba(255, 255, 255, 0.06);
+            stroke-width: 1;
+            transition: fill 0.4s ease, filter 0.3s ease;
+            cursor: pointer;
+        }
+
+        .sector-group:hover .sector-path {
+            filter: brightness(1.2);
+        }
+
+        .sector-code {
+            font-size: 19px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-anchor: middle;
+            dominant-baseline: central;
+            pointer-events: none;
+            transition: fill 0.3s ease;
+        }
+
+        .sector-sub {
+            font-size: 9.5px;
+            font-weight: 600;
+            text-anchor: middle;
+            dominant-baseline: central;
+            pointer-events: none;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            opacity: 0.75;
+            transition: fill 0.3s ease;
+        }
+
+        /* Drag Helper Hint */
+        .drag-hint {
+            position: absolute;
+            bottom: 24px;
+            left: 24px;
+            z-index: 15;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 8px 16px;
+            border-radius: 30px;
+            font-weight: 500;
+            font-size: 0.74rem;
+            letter-spacing: 0.4px;
+            color: #94a3b8;
+            pointer-events: none;
+        }
+
+        /* ==============================================================
+           SECOND PAGE: EXECUTIVE 3D FLIP SHEET WORKSPACE
+           ============================================================== */
+        .creator-page {
+            position: fixed;
+            inset: 0;
+            z-index: 50;
+            background: radial-gradient(circle at 50% 20%, var(--active-bg) 0%, #050811 85%);
+            backdrop-filter: blur(22px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 24px 40px;
+            opacity: 0;
+            pointer-events: none;
+            transform: scale(1.04);
+            transition: opacity 0.45s cubic-bezier(0.22, 1, 0.36, 1), transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+            overflow-y: auto;
+        }
+
+        .creator-page.open {
+            opacity: 1;
+            pointer-events: auto;
+            transform: scale(1);
+        }
+
+        /* Workspace Top Header */
+        .creator-header {
+            width: 100%;
+            max-width: 1060px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 14px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .back-wheel-btn {
+            background: rgba(15, 23, 42, 0.75);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #e2e8f0;
+            padding: 9px 18px;
+            border-radius: 30px;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.25s ease;
+        }
+
+        .back-wheel-btn:hover {
+            border-color: var(--active-accent);
+            background: rgba(30, 41, 59, 0.9);
+            transform: translateX(-2px);
+        }
+
+        .creator-title-area {
+            text-align: center;
+        }
+
+        .creator-title-area span {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 2.5px;
+            color: var(--active-accent);
+            font-weight: 700;
+            display: block;
+        }
+
+        .creator-title-area h2 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 2rem;
+            margin: 2px 0 0 0;
+            color: #ffffff;
+        }
+
+        /* API Key Box */
+        .api-key-box {
+            display: flex;
+            align-items: center;
+            background: rgba(10, 15, 28, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 30px;
+            padding: 5px 14px;
+            gap: 8px;
+        }
+
+        .api-key-box input {
+            background: transparent;
+            border: none;
+            color: #f8fafc;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 0.76rem;
+            width: 175px;
+            outline: none;
+            user-select: text;
+        }
+
+        .api-key-box input::placeholder {
+            color: #64748b;
+        }
+
+        /* Mode Switcher Bar (Triggers 3D Axis Flip) */
+        .mode-switch-bar {
+            display: flex;
+            background: rgba(10, 14, 24, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 40px;
+            padding: 5px;
+            gap: 6px;
+            margin-bottom: 22px;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+        }
+
+        .mode-tab {
+            padding: 10px 24px;
+            border-radius: 30px;
+            border: none;
+            background: transparent;
+            color: #94a3b8;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .mode-tab.active {
+            background: linear-gradient(135deg, var(--active-part) 0%, var(--active-bg) 100%);
+            color: #ffffff;
+            border: 1px solid var(--active-accent);
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
+        }
+
+        /* 3D FLIP STAGE & CARD */
+        .sheet-stage {
+            width: 100%;
+            max-width: 780px;
+            height: 450px;
+            perspective: 1800px;
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .flip-sheet {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.85s cubic-bezier(0.34, 1.45, 0.64, 1);
+        }
+
+        .flip-sheet.flipped {
+            transform: rotateY(180deg);
+        }
+
+        .sheet-face {
+            position: absolute;
+            inset: 0;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            background: linear-gradient(160deg, rgba(17, 25, 42, 0.96) 0%, rgba(8, 12, 22, 0.98) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-top: 2px solid var(--active-accent);
+            border-radius: 22px;
+            padding: 28px 34px;
+            box-shadow: 0 30px 70px rgba(0, 0, 0, 0.75);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow-y: auto;
+        }
+
+        .sheet-back {
+            transform: rotateY(180deg);
+        }
+
+        .sheet-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+        }
+
+        .sheet-head h3 {
+            margin: 0;
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.5rem;
+            color: #f8fafc;
+            letter-spacing: 0.5px;
+        }
+
+        .sheet-badge {
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.4px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--active-accent);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
+        /* Form Grid Inside Front Sheet */
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px 18px;
+            margin-bottom: 16px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .form-group.full-width {
+            grid-column: span 2;
+        }
+
+        .form-group label {
+            font-size: 0.74rem;
+            font-weight: 600;
+            color: #cbd5e1;
+            letter-spacing: 0.4px;
+        }
+
+        .form-input {
+            background: rgba(7, 11, 20, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 10px;
+            padding: 10px 14px;
+            color: #f8fafc;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 0.84rem;
+            outline: none;
+            user-select: text;
+            transition: border-color 0.25s;
+        }
+
+        .form-input:focus {
+            border-color: var(--active-accent);
+        }
+
+        textarea.form-input {
+            resize: none;
+            height: 68px;
+        }
+
+        /* File Upload Zone Inside Back Sheet */
+        .upload-zone {
+            border: 1.5px dashed rgba(255, 255, 255, 0.22);
+            border-radius: 16px;
+            background: rgba(7, 11, 20, 0.65);
+            padding: 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            margin-bottom: 14px;
+        }
+
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: var(--active-accent);
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .upload-icon {
+            font-size: 2rem;
+            margin-bottom: 6px;
+            display: block;
+        }
+
+        .upload-zone p {
+            margin: 4px 0;
+            font-size: 0.85rem;
+            color: #e2e8f0;
+            font-weight: 600;
+        }
+
+        .upload-zone small {
+            font-size: 0.74rem;
+            color: #94a3b8;
+        }
+
+        .file-pill {
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.4);
+            color: #34d399;
+            padding: 8px 14px;
+            border-radius: 10px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .sheet-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .flip-link-btn {
+            background: transparent;
+            border: none;
+            color: #94a3b8;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 0.78rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: underline;
+            transition: color 0.2s;
+        }
+
+        .flip-link-btn:hover {
+            color: #ffffff;
+        }
+
+        /* --- GENERATED LEGAL DOCUMENT PREVIEW & EXPORT --- */
+        .output-section {
+            width: 100%;
+            max-width: 780px;
+            margin-top: 24px;
+            display: none;
+            flex-direction: column;
+            gap: 16px;
+            padding-bottom: 40px;
+            animation: fadeInOutput 0.4s ease-out;
+        }
+
+        .output-section.visible {
+            display: flex;
+        }
+
+        @keyframes fadeInOutput {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .paper-container {
+            background: #fdfbf7;
+            color: #0f172a;
+            border-radius: 14px;
+            padding: 42px 48px;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.75);
+            border: 1px solid #e2e8f0;
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            line-height: 1.65;
+            font-size: 1.08rem;
+            user-select: text;
+            height: auto;
+            overflow: visible;
+        }
+
+        .paper-container h1, .paper-container h2, .paper-container h3 {
+            font-family: 'Cormorant Garamond', serif;
+            color: #090d16;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 1.5px solid #cbd5e1;
+            padding-bottom: 10px;
+            margin-top: 0;
+            font-size: 1.3rem;
+        }
+
+        .paper-content {
+            white-space: pre-wrap;
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            font-size: 1.1rem;
+            color: #1e293b;
+            outline: none;
+        }
+
+        .output-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            padding: 14px 22px;
+            border-radius: 16px;
+        }
+
+        .export-pdf-btn {
+            padding: 12px 28px;
+            border-radius: 50px;
+            border: 1px solid #34d399;
+            background: linear-gradient(135deg, #059669 0%, #064e3b 100%);
+            color: #ffffff;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 0.84rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 10px 25px rgba(5, 150, 105, 0.4);
+            transition: all 0.25s ease;
+        }
+
+        .export-pdf-btn:hover {
+            transform: translateY(-2px);
+            filter: brightness(1.15);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="app">
+        <!-- TOP RIGHT COMPACT AI DROPDOWN & SOUND BUTTON -->
+        <div class="top-right-controls">
+            <button class="sound-btn" id="sound-toggle" onclick="toggleSound()" title="Mute/Unmute Sound">🔊</button>
+            
+            <div class="ai-dropdown" id="ai-dropdown">
+                <button class="ai-trigger-btn" onclick="toggleDropdown(event)">
+                    <span class="status-dot status-fast" id="current-ai-dot"></span>
+                    <span id="current-ai-name">Gemini 3.8</span>
+                    <span style="font-size: 0.65rem; opacity: 0.6;">▼</span>
+                </button>
+                <div class="ai-dropdown-menu" id="ai-menu">
+                    <button class="ai-option active" onclick="selectModel('Gemini 3.8', 'fast', this)">
+                        <span>Gemini 3.8</span>
+                        <span class="status-dot status-fast"></span>
+                    </button>
+                    <button class="ai-option" onclick="selectModel('Claude', 'fast', this)">
+                        <span>Claude</span>
+                        <span class="status-dot status-fast"></span>
+                    </button>
+                    <button class="ai-option" onclick="selectModel('ChatGPT', 'busy', this)">
+                        <span>ChatGPT</span>
+                        <span class="status-dot status-busy" title="High Traffic"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- VOLUMETRIC SPOTLIGHT CONICAL BEAM -->
+        <svg class="beam-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <defs>
+                <linearGradient id="beam-grad" x1="15%" y1="50%" x2="100%" y2="50%">
+                    <stop offset="0%" id="beam-stop-start" stop-color="#d4af37" stop-opacity="0.38" />
+                    <stop offset="55%" id="beam-stop-mid" stop-color="#d4af37" stop-opacity="0.14" />
+                    <stop offset="100%" id="beam-stop-end" stop-color="#d4af37" stop-opacity="0.02" />
+                </linearGradient>
+            </defs>
+            <polygon id="beam-polygon" points="18,36 100,-8 100,108 18,64" fill="url(#beam-grad)" />
+        </svg>
+
+        <!-- LEFT LUXURY SPINNING WHEEL -->
+        <div class="wheel-container" id="wheel-container">
+            <svg id="wheel-svg" viewBox="-420 -420 840 840">
+                <circle cx="0" cy="0" r="282" fill="#05080f" stroke="rgba(255,255,255,0.06)" stroke-width="2" />
+                <g id="wheel-rotator"></g>
+            </svg>
+        </div>
+
+        <!-- EXECUTIVE CENTER CONTENT -->
+        <div class="beam-content-wrapper" id="beam-content">
+            <div class="suite-tag" id="suite-tag">Legal Intelligence Suite</div>
+            <h1 class="doc-title" id="main-title">Rent Agreement</h1>
+            <button class="create-now-btn" id="create-btn" onclick="openDocCreator()">
+                Create Now <span>→</span>
+            </button>
+        </div>
+
+        <!-- DRAG HINT -->
+        <div class="drag-hint">🖱️ Drag or Scroll Wheel to Navigate</div>
+
+        <!-- ==============================================================
+             SECOND PAGE: 3D FLIP SHEET LEGAL DRAFTING STUDIO
+             ============================================================== -->
+        <div class="creator-page" id="creator-page">
+            <!-- Top Navigation & API Key Bar -->
+            <div class="creator-header">
+                <button class="back-wheel-btn" onclick="closeDocCreator()">
+                    <span>←</span> Back to Wheel
+                </button>
+
+                <div class="creator-title-area">
+                    <span id="studio-suite-tag">EXECUTIVE DRAFTING STUDIO</span>
+                    <h2 id="studio-doc-title">Rent Agreement</h2>
+                </div>
+
+                <div class="api-key-box" title="Enter Gemini or OpenAI API Key for Live AI Generation">
+                    <span>🔑</span>
+                    <input type="password" id="user-api-key" placeholder="Paste Gemini / OpenAI Key..." />
+                </div>
+            </div>
+
+            <!-- Top Mode Switcher (Flips the Sheet on Axis) -->
+            <div class="mode-switch-bar">
+                <button class="mode-tab active" id="tab-details" onclick="flipSheetTo('front')">
+                    📝 Fill Details to Create
+                </button>
+                <button class="mode-tab" id="tab-old-doc" onclick="flipSheetTo('back')">
+                    🔄 Create from Old Document
+                </button>
+            </div>
+
+            <!-- 3D Axis Flipping Sheet Stage -->
+            <div class="sheet-stage">
+                <div class="flip-sheet" id="flip-sheet">
+
+                    <!-- FRONT SIDE: USER DETAILS FORM -->
+                    <div class="sheet-face sheet-front">
+                        <div>
+                            <div class="sheet-head">
+                                <h3>Enter Document Particulars</h3>
+                                <span class="sheet-badge" id="front-ai-badge">Engine: Gemini 3.8</span>
+                            </div>
+                            <div class="form-grid" id="dynamic-form-fields">
+                                <!-- Populated dynamically based on selected Legal Document -->
+                            </div>
+                        </div>
+
+                        <div class="sheet-footer">
+                            <button class="flip-link-btn" onclick="flipSheetTo('back')">
+                                Have an existing document? Flip sheet to upload ↻
+                            </button>
+                            <button class="create-now-btn" id="generate-from-details-btn" onclick="generateDraft('details')">
+                                ✨ Generate Legal Draft
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- BACK SIDE: UPLOAD OLD DOCUMENT (PDF / TXT) -->
+                    <div class="sheet-face sheet-back">
+                        <div>
+                            <div class="sheet-head">
+                                <h3>Create from Old Document</h3>
+                                <span class="sheet-badge">Reference Redrafting Mode</span>
+                            </div>
+
+                            <!-- Hidden File Input -->
+                            <input type="file" id="old-doc-file" accept=".pdf,.txt,.doc,.docx" style="display: none;" onchange="handleFileUpload(event)" />
+
+                            <div class="upload-zone" id="upload-drop-zone" onclick="document.getElementById('old-doc-file').click()">
+                                <span class="upload-icon">📄</span>
+                                <p>Click to Upload or Drag & Drop Old Document</p>
+                                <small>Supports PDF (.pdf) or Text (.txt) files — Automatically extracts clauses</small>
+                            </div>
+
+                            <div class="file-pill" id="uploaded-file-pill">
+                                <span id="uploaded-file-name">document.pdf loaded</span>
+                                <span style="cursor:pointer;" onclick="clearUploadedFile()">✕</span>
+                            </div>
+
+                            <div class="form-group full-width">
+                                <label>New Updates / Custom Modifications Needed in New Draft:</label>
+                                <textarea class="form-input" id="redraft-instructions" placeholder="e.g., Change First Party name to 'Aarav Sharma', update dates to 2026, increase monthly rent by 10%, and make jurisdiction New Delhi..."></textarea>
+                            </div>
+                        </div>
+
+                        <div class="sheet-footer">
+                            <button class="flip-link-btn" onclick="flipSheetTo('front')">
+                                ↺ Flip back to Manual Details Form
+                            </button>
+                            <button class="create-now-btn" id="generate-from-old-btn" onclick="generateDraft('old_doc')">
+                                ⚡ Draft from Old Document
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- GENERATED DRAFT OUTPUT & EXPORT AS PDF -->
+            <div class="output-section" id="output-section">
+                <div class="paper-container" id="pdf-paper">
+                    <h2 id="paper-heading">LEGAL AGREEMENT</h2>
+                    <div class="paper-content" id="paper-body" contenteditable="true"></div>
+                </div>
+
+                <div class="output-actions">
+                    <span style="font-size: 0.8rem; color: #94a3b8;">
+                        💡 <b>Tip:</b> You can click directly on the document above to edit any word before exporting.
+                    </span>
+                    <button class="export-pdf-btn" onclick="exportDocumentAsPDF()">
+                        📥 Export as PDF
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // Set up PDF.js Worker
+        if (window.pdfjsLib) {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+        }
+
+        // --- WEB AUDIO API SYNTHESIZER ---
+        let audioCtx = null;
+        let soundEnabled = true;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playWheelTick() {
+            if (!soundEnabled) return;
+            initAudio();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(420, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(110, audioCtx.currentTime + 0.04);
+
+            gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.04);
+
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.045);
+        }
+
+        function playSlideChime() {
+            if (!soundEnabled) return;
+            initAudio();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(260, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(520, audioCtx.currentTime + 0.16);
+
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.18);
+
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.19);
+        }
+
+        function playFlipSound() {
+            if (!soundEnabled) return;
+            initAudio();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(190, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(460, audioCtx.currentTime + 0.22);
+
+            gain.gain.setValueAtTime(0.14, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.24);
+
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.25);
+        }
+
+        function playClickSound() {
+            if (!soundEnabled) return;
+            initAudio();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(680, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(240, audioCtx.currentTime + 0.035);
+
+            gain.gain.setValueAtTime(0.14, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.035);
+
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.04);
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            document.getElementById('sound-toggle').innerText = soundEnabled ? '🔊' : '🔇';
+            if (soundEnabled) playClickSound();
+        }
+
+        // --- LUXURY EXECUTIVE COLOR PALETTE & DYNAMIC FORM SCHEMAS ---
+        const items = [
+            {
+                code: 'RA', sub: 'Rent', title: 'Rent Agreement',
+                bgOuter: '#060911', bgInner: '#0f1d3a',
+                beamColor: '#38bdf8',
+                partRest: '#111c33', partActive: '#0284c7',
+                accent: '#38bdf8', btnText: '#ffffff',
+                fields: [
+                    { id: 'f_party1', label: 'Landlord / Lessor Full Name', placeholder: 'e.g., Rajeshwar Singhania' },
+                    { id: 'f_party2', label: 'Tenant / Lessee Full Name', placeholder: 'e.g., Kabir Malhotra' },
+                    { id: 'f_prop', label: 'Complete Leased Property Address', placeholder: 'e.g., Flat 402, Imperial Towers, Connaught Place, New Delhi' },
+                    { id: 'f_amount', label: 'Monthly Rent & Security Deposit (₹)', placeholder: 'e.g., ₹45,000/month | Deposit: ₹1,35,000' },
+                    { id: 'f_terms', label: 'Lease Period, Lock-in & Special Clauses', placeholder: 'e.g., 11 Months starting 1st Nov 2026, 10% annual escalation, no sub-letting...', full: true }
+                ]
+            },
+            {
+                code: 'CD', sub: 'Contract', title: 'Contract Drafting',
+                bgOuter: '#09070e', bgInner: '#1f1638',
+                beamColor: '#c084fc',
+                partRest: '#18122b', partActive: '#7e22ce',
+                accent: '#c084fc', btnText: '#ffffff',
+                fields: [
+                    { id: 'f_party1', label: 'Client / First Party Name', placeholder: 'e.g., Apex Global Ventures Pvt. Ltd.' },
+                    { id: 'f_party2', label: 'Service Provider / Second Party Name', placeholder: 'e.g., NeuralWorks Tech Solutions' },
+                    { id: 'f_prop', label: 'Project Scope & Deliverables', placeholder: 'e.g., Enterprise SaaS Architecture & Maintenance' },
+                    { id: 'f_amount', label: 'Contract Value & Payment Milestones', placeholder: 'e.g., ₹8,50,000 (40% Advance, 60% on Delivery)' },
+                    { id: 'f_terms', label: 'Termination, Indemnity & Governing Law', placeholder: 'e.g., 30 days notice period, IP rights transfer on full payment, Mumbai Jurisdiction...', full: true }
+                ]
+            },
+            {
+                code: 'LN', sub: 'Legal', title: 'Legal Notice',
+                bgOuter: '#0c0906', bgInner: '#291d10',
+                beamColor: '#eab308',
+                partRest: '#1f1710', partActive: '#b45309',
+                accent: '#facc15', btnText: '#ffffff',
+                fields: [
+                    { id: 'f_party1', label: 'Sender / Complainant Name & Address', placeholder: 'e.g., Vikramaditya Rao, New Delhi' },
+                    { id: 'f_party2', label: 'Recipient / Defaulter Name & Address', placeholder: 'e.g., Zenith Builders & Developers' },
+                    { id: 'f_prop', label: 'Subject Matter of Grievance / Default', placeholder: 'e.g., Non-refund of booking amount / Breach of agreement' },
+                    { id: 'f_amount', label: 'Claim / Recovery Amount & Notice Period', placeholder: 'e.g., ₹4,20,000 with 18% interest within 15 days' },
+                    { id: 'f_terms', label: 'Chronology of Facts & Legal Demand', placeholder: 'e.g., Payment made on 12 Jan 2026, multiple reminders ignored, civil/criminal warning...', full: true }
+                ]
+            },
+            {
+                code: 'PT', sub: 'Petition', title: 'Petition',
+                bgOuter: '#050c09', bgInner: '#0d291e',
+                beamColor: '#34d399',
+                partRest: '#0d2119', partActive: '#059669',
+                accent: '#34d399', btnText: '#ffffff',
+                fields: [
+                    { id: 'f_party1', label: 'Petitioner Full Name', placeholder: 'e.g., Ananya Verma' },
+                    { id: 'f_party2', label: 'Respondent Full Name', placeholder: 'e.g., State / Municipal Corporation' },
+                    { id: 'f_prop', label: 'Hon’ble Court / Forum Name', placeholder: 'e.g., High Court of Judicature at Allahabad / NCLT' },
+                    { id: 'f_amount', label: 'Jurisdiction & Statutory Provision Invoked', placeholder: 'e.g., Writ Petition under Article 226 / Section 9 IBC' },
+                    { id: 'f_terms', label: 'Grounds of Petition & Prayer Clause', placeholder: 'e.g., Violation of principles of natural justice, seeking immediate stay order...', full: true }
+                ]
+            },
+            {
+                code: 'NDA', sub: 'NDA', title: 'NDA Drafting',
+                bgOuter: '#0d0609', bgInner: '#2e101d',
+                beamColor: '#fb7185',
+                partRest: '#241019', partActive: '#be123c',
+                accent: '#fb7185', btnText: '#ffffff',
+                fields: [
+                    { id: 'f_party1', label: 'Disclosing Party Name', placeholder: 'e.g., Quantum FinTech Labs' },
+                    { id: 'f_party2', label: 'Receiving Party Name', placeholder: 'e.g., Siddharth Nair (Consultant)' },
+                    { id: 'f_prop', label: 'Nature of Confidential Information', placeholder: 'e.g., Proprietary AI Source Code, Financial Projections & Client Lists' },
+                    { id: 'f_amount', label: 'Confidentiality Term & Survival Period', placeholder: 'e.g., 3 Years from execution, Trade Secrets in perpetuity' },
+                    { id: 'f_terms', label: 'Permitted Purpose & Non-Solicitation Clauses', placeholder: 'e.g., Evaluation of potential merger, injunctive relief on breach...', full: true }
+                ]
+            },
+            {
+                code: 'DS', sub: 'Summary', title: 'Document Summarisation',
+                bgOuter: '#050b0e', bgInner: '#0e2933',
+                beamColor: '#2dd4bf',
+                partRest: '#0d2026', partActive: '#0f766e',
+                accent: '#2dd4bf', btnText: '#ffffff',
+                fields: [
+                    { id: 'f_party1', label: 'Document Title / Case Citation', placeholder: 'e.g., Share Purchase Agreement / Supreme Court Judgment' },
+                    { id: 'f_party2', label: 'Primary Parties Involved', placeholder: 'e.g., Acquirer Corp & Target Startup' },
+                    { id: 'f_prop', label: 'Focus Areas for Executive Summary', placeholder: 'e.g., Financial Liabilities, Lock-in, Termination Risks' },
+                    { id: 'f_amount', label: 'Preferred Output Format', placeholder: 'e.g., Clause-by-Clause Breakdown + Red Flag Analysis' },
+                    { id: 'f_terms', label: 'Paste Raw Legal Text / Clauses to Summarise', placeholder: 'Paste clauses or text here, or flip sheet to upload a full PDF/TXT file...', full: true }
+                ]
+            }
+        ];
+
+        const fullWheelItems = [...items, ...items];
+        const totalSegments = fullWheelItems.length;
+        const angleStep = 360 / totalSegments;
+        const innerRadius = 285;
+        const outerRadius = 410;
+
+        const rotator = document.getElementById('wheel-rotator');
+        const wheelContainer = document.getElementById('wheel-container');
+        const app = document.getElementById('app');
+        const stopStart = document.getElementById('beam-stop-start');
+        const stopMid = document.getElementById('beam-stop-mid');
+        const stopEnd = document.getElementById('beam-stop-end');
+        const mainTitle = document.getElementById('main-title');
+        const suiteTag = document.getElementById('suite-tag');
+        const createBtn = document.getElementById('create-btn');
+        const beamContent = document.getElementById('beam-content');
+
+        let currentRotation = 0;
+        let activeSegmentIndex = -1;
+        let selectedAI = 'Gemini 3.8';
+        let isInitialLoad = true;
+        let extractedOldDocText = '';
+
+        function createSectorPath(startAngleDeg, endAngleDeg, rIn, rOut) {
+            const toRad = (deg) => (deg * Math.PI) / 180;
+            const a1 = toRad(startAngleDeg);
+            const a2 = toRad(endAngleDeg);
+
+            const x1In = rIn * Math.cos(a1), y1In = rIn * Math.sin(a1);
+            const x2Out = rOut * Math.cos(a1), y2Out = rOut * Math.sin(a1);
+            const x3Out = rOut * Math.cos(a2), y3Out = rOut * Math.sin(a2);
+            const x4In = rIn * Math.cos(a2), y4In = rIn * Math.sin(a2);
+
+            return `M ${x1In} ${y1In} L ${x2Out} ${y2Out} A ${rOut} ${rOut} 0 0 1 ${x3Out} ${y3Out} L ${x4In} ${y4In} A ${rIn} ${rIn} 0 0 0 ${x1In} ${y1In} Z`;
+        }
+
+        const sectorGroups = fullWheelItems.map((item, index) => {
+            const centerAngle = index * angleStep;
+            const halfGap = 0.55;
+            const startA = centerAngle - angleStep / 2 + halfGap;
+            const endA = centerAngle + angleStep / 2 - halfGap;
+
+            const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            g.setAttribute('class', 'sector-group');
+
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('class', 'sector-path');
+            path.setAttribute('d', createSectorPath(startA, endA, innerRadius, outerRadius));
+            path.setAttribute('fill', item.partRest);
+
+            const midRadius = (innerRadius + outerRadius) / 2;
+            const rad = (centerAngle * Math.PI) / 180;
+            const tx = midRadius * Math.cos(rad);
+            const ty = midRadius * Math.sin(rad);
+
+            const textGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            textGroup.setAttribute('data-x', tx);
+            textGroup.setAttribute('data-y', ty);
+
+            const codeText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            codeText.setAttribute('class', 'sector-code');
+            codeText.setAttribute('y', '-6');
+            codeText.textContent = item.code;
+
+            const subText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            subText.setAttribute('class', 'sector-sub');
+            subText.setAttribute('y', '12');
+            subText.textContent = item.sub;
+
+            textGroup.appendChild(codeText);
+            textGroup.appendChild(subText);
+            g.appendChild(path);
+            g.appendChild(textGroup);
+
+            g.addEventListener('click', () => {
+                if (!hasDragged) snapToSegment(index);
+            });
+
+            rotator.appendChild(g);
+            return { g, path, codeText, subText, textGroup, item, index };
+        });
+
+        function renderWheel() {
+            rotator.setAttribute('transform', `rotate(${currentRotation})`);
+
+            let closestIdx = 0;
+            let minDiff = Infinity;
+
+            sectorGroups.forEach(({ textGroup, index }) => {
+                const baseAngle = index * angleStep;
+                let netAngle = (baseAngle + currentRotation) % 360;
+                if (netAngle > 180) netAngle -= 360;
+                if (netAngle < -180) netAngle += 360;
+
+                const diff = Math.abs(netAngle);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closestIdx = index;
+                }
+
+                const tx = textGroup.getAttribute('data-x');
+                const ty = textGroup.getAttribute('data-y');
+                textGroup.setAttribute('transform', `translate(${tx}, ${ty}) rotate(${-currentRotation})`);
+            });
+
+            if (closestIdx !== activeSegmentIndex) {
+                setActiveSegment(closestIdx);
+            }
+        }
+
+        function setActiveSegment(index) {
+            activeSegmentIndex = index;
+            const activeData = fullWheelItems[index];
+
+            if (!isInitialLoad) {
+                playWheelTick();
+            }
+
+            sectorGroups.forEach(({ path, codeText, subText, item }, i) => {
+                const isActive = (i === index);
+                path.setAttribute('fill', isActive ? item.partActive : item.partRest);
+                codeText.setAttribute('fill', isActive ? '#ffffff' : '#94a3b8');
+                subText.setAttribute('fill', isActive ? '#e2e8f0' : '#64748b');
+            });
+
+            app.style.background = `radial-gradient(circle at 65% 50%, ${activeData.bgInner} 0%, ${activeData.bgOuter} 100%)`;
+            stopStart.setAttribute('stop-color', activeData.beamColor);
+            stopMid.setAttribute('stop-color', activeData.beamColor);
+            stopEnd.setAttribute('stop-color', activeData.beamColor);
+
+            // Sync CSS variables with active wheel theme
+            document.documentElement.style.setProperty('--active-accent', activeData.accent);
+            document.documentElement.style.setProperty('--active-part', activeData.partActive);
+            document.documentElement.style.setProperty('--active-bg', activeData.bgInner);
+
+            suiteTag.style.color = activeData.accent;
+            createBtn.style.background = `linear-gradient(135deg, ${activeData.partActive} 0%, ${activeData.bgInner} 100%)`;
+            createBtn.style.color = activeData.btnText;
+            createBtn.style.borderColor = activeData.accent;
+
+            beamContent.style.opacity = '0.2';
+            beamContent.style.transform = 'translate(-50%, -46%)';
+            setTimeout(() => {
+                mainTitle.innerText = activeData.title;
+                beamContent.style.opacity = '1';
+                beamContent.style.transform = 'translate(-50%, -50%)';
+            }, 130);
+
+            isInitialLoad = false;
+        }
+
+        function snapToSegment(index) {
+            const targetBase = -index * angleStep;
+            const diff = ((targetBase - currentRotation + 540) % 360) - 180;
+            animateRotation(currentRotation + diff);
+        }
+
+        function animateRotation(target) {
+            const start = currentRotation;
+            const change = target - start;
+            const duration = 260;
+            let startTime = null;
+
+            function step(timestamp) {
+                if (!startTime) startTime = timestamp;
+                const progress = Math.min((timestamp - startTime) / duration, 1);
+                const ease = 1 - Math.pow(1 - progress, 3);
+                currentRotation = start + change * ease;
+                renderWheel();
+                if (progress < 1) {
+                    requestAnimationFrame(step);
+                } else {
+                    playSlideChime();
+                }
+            }
+            requestAnimationFrame(step);
+        }
+
+        // --- Drag & Scroll Controls (Disabled when Studio Page is open) ---
+        let isDragging = false;
+        let hasDragged = false;
+        let startY = 0;
+        let startRot = 0;
+
+        wheelContainer.addEventListener('mousedown', (e) => {
+            if (document.getElementById('creator-page').classList.contains('open')) return;
+            initAudio();
+            isDragging = true;
+            hasDragged = false;
+            startY = e.clientY;
+            startRot = currentRotation;
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            const deltaY = e.clientY - startY;
+            if (Math.abs(deltaY) > 4) hasDragged = true;
+            currentRotation = startRot + deltaY * 0.35;
+            renderWheel();
+        });
+
+        window.addEventListener('mouseup', () => {
+            if (!isDragging) return;
+            isDragging = false;
+            const nearestIdx = Math.round(-currentRotation / angleStep);
+            animateRotation(-nearestIdx * angleStep);
+        });
+
+        let scrollTimer;
+        window.addEventListener('wheel', (e) => {
+            if (document.getElementById('creator-page').classList.contains('open')) return;
+            initAudio();
+            currentRotation -= e.deltaY * 0.14;
+            renderWheel();
+            clearTimeout(scrollTimer);
+            scrollTimer = setTimeout(() => {
+                const nearestIdx = Math.round(-currentRotation / angleStep);
+                animateRotation(-nearestIdx * angleStep);
+            }, 120);
+        });
+
+        // --- AI Dropdown Logic ---
+        function toggleDropdown(e) {
+            e.stopPropagation();
+            playClickSound();
+            document.getElementById('ai-menu').classList.toggle('show');
+        }
+
+        function selectModel(modelName, statusType, btnEl) {
+            playClickSound();
+            selectedAI = modelName;
+            document.getElementById('current-ai-name').innerText = modelName;
+            document.getElementById('front-ai-badge').innerText = `Engine: ${modelName}`;
+
+            const dot = document.getElementById('current-ai-dot');
+            dot.className = 'status-dot ' + (statusType === 'busy' ? 'status-busy' : 'status-fast');
+
+            document.querySelectorAll('.ai-option').forEach(b => b.classList.remove('active'));
+            btnEl.classList.add('active');
+            document.getElementById('ai-menu').classList.remove('show');
+        }
+
+        window.addEventListener('click', () => {
+            document.getElementById('ai-menu').classList.remove('show');
+        });
+
+        // ==============================================================
+        // SECOND PAGE: 3D FLIP SHEET & AI DRAFTING FUNCTIONS
+        // ==============================================================
+        function openDocCreator() {
+            playSlideChime();
+            const activeData = fullWheelItems[activeSegmentIndex];
+
+            document.getElementById('studio-doc-title').innerText = activeData.title;
+            document.getElementById('front-ai-badge').innerText = `Engine: ${selectedAI}`;
+
+            // Style generate buttons to match active theme
+            const btnStyle = `linear-gradient(135deg, ${activeData.partActive} 0%, ${activeData.bgInner} 100%)`;
+            ['generate-from-details-btn', 'generate-from-old-btn'].forEach(id => {
+                const btn = document.getElementById(id);
+                btn.style.background = btnStyle;
+                btn.style.borderColor = activeData.accent;
+                btn.style.color = '#ffffff';
+            });
+
+            // Build dynamic form fields for the chosen legal document
+            const formGrid = document.getElementById('dynamic-form-fields');
+            formGrid.innerHTML = '';
+            activeData.fields.forEach(f => {
+                const group = document.createElement('div');
+                group.className = 'form-group' + (f.full ? ' full-width' : '');
+                if (f.full) {
+                    group.innerHTML = `
+                        <label>${f.label}</label>
+                        <textarea class="form-input" id="${f.id}" placeholder="${f.placeholder}"></textarea>
+                    `;
+                } else {
+                    group.innerHTML = `
+                        <label>${f.label}</label>
+                        <input type="text" class="form-input" id="${f.id}" placeholder="${f.placeholder}" />
+                    `;
+                }
+                formGrid.appendChild(group);
+            });
+
+            // Reset sheet to Front & hide previous output
+            flipSheetTo('front', true);
+            document.getElementById('output-section').classList.remove('visible');
+            document.getElementById('creator-page').classList.add('open');
+        }
+
+        function closeDocCreator() {
+            playClickSound();
+            document.getElementById('creator-page').classList.remove('open');
+        }
+
+        function flipSheetTo(side, silent = false) {
+            if (!silent) playFlipSound();
+            const sheet = document.getElementById('flip-sheet');
+            const tabDetails = document.getElementById('tab-details');
+            const tabOldDoc = document.getElementById('tab-old-doc');
+
+            if (side === 'back') {
+                sheet.classList.add('flipped');
+                tabOldDoc.classList.add('active');
+                tabDetails.classList.remove('active');
+            } else {
+                sheet.classList.remove('flipped');
+                tabDetails.classList.add('active');
+                tabOldDoc.classList.remove('active');
+            }
+        }
+
+        // --- File Upload (PDF / TXT) Reader ---
+        async function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            playClickSound();
+
+            const pill = document.getElementById('uploaded-file-pill');
+            const nameSpan = document.getElementById('uploaded-file-name');
+            pill.style.display = 'flex';
+            nameSpan.innerText = `⏳ Reading ${file.name}...`;
+
+            try {
+                if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+                    const arrayBuffer = await file.arrayBuffer();
+                    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                    let textContent = '';
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const txt = await page.getTextContent();
+                        textContent += txt.items.map(s => s.str).join(' ') + '\n\n';
+                    }
+                    extractedOldDocText = textContent.trim();
+                } else {
+                    extractedOldDocText = await file.text();
+                }
+                nameSpan.innerText = `✅ ${file.name} (${Math.max(1, Math.round(extractedOldDocText.length / 1000))}k chars extracted)`;
+            } catch (err) {
+                console.error(err);
+                extractedOldDocText = `[Uploaded Reference File: ${file.name}]`;
+                nameSpan.innerText = `✅ ${file.name} attached`;
+            }
+        }
+
+        function clearUploadedFile() {
+            playClickSound();
+            extractedOldDocText = '';
+            document.getElementById('old-doc-file').value = '';
+            document.getElementById('uploaded-file-pill').style.display = 'none';
+        }
+
+        // --- AI API Call + Executive Fallback Generator ---
+        async function generateDraft(mode) {
+            playClickSound();
+            const activeData = fullWheelItems[activeSegmentIndex];
+            const apiKey = document.getElementById('user-api-key').value.trim();
+
+            const btnId = mode === 'details' ? 'generate-from-details-btn' : 'generate-from-old-btn';
+            const btn = document.getElementById(btnId);
+            const originalBtnHTML = btn.innerHTML;
+            btn.innerHTML = `⏳ Drafting with ${selectedAI}...`;
+            btn.disabled = true;
+
+            let promptContext = '';
+            if (mode === 'details') {
+                const p1 = document.getElementById('f_party1')?.value || 'First Party [Name]';
+                const p2 = document.getElementById('f_party2')?.value || 'Second Party [Name]';
+                const prop = document.getElementById('f_prop')?.value || 'Standard Subject Matter / Property';
+                const amt = document.getElementById('f_amount')?.value || 'Mutually Agreed Consideration';
+                const terms = document.getElementById('f_terms')?.value || 'Standard statutory legal clauses';
+
+                promptContext = `Draft a formal, comprehensive Indian legal "${activeData.title}".\n` +
+                    `- First Party: ${p1}\n- Second Party: ${p2}\n- Subject/Property/Forum: ${prop}\n` +
+                    `- Consideration/Claim/Term: ${amt}\n- Specific Terms: ${terms}`;
+            } else {
+                const instructions = document.getElementById('redraft-instructions').value || 'Update dates, refine legal language, and modernize clauses.';
+                const refText = extractedOldDocText ? extractedOldDocText.substring(0, 6000) : 'Standard Reference Template';
+                promptContext = `Redraft and modernize this existing "${activeData.title}" based on the uploaded document.\n` +
+                    `Modifications Requested: ${instructions}\n\nExisting Document Content:\n${refText}`;
+            }
+
+            let generatedText = '';
+
+            // If user entered an API key, call live Gemini or OpenAI endpoint
+            if (apiKey) {
+                try {
+                    if (apiKey.startsWith('AIza')) {
+                        // Google Gemini API
+                        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                contents: [{ parts: [{ text: `You are an elite Senior Legal Counsel. Write a complete, court-ready legal document without markdown asterisks:\n\n${promptContext}` }] }]
+                            })
+                        });
+                        const data = await res.json();
+                        generatedText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                    } else {
+                        // OpenAI ChatGPT Compatible API
+                        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${apiKey}`
+                            },
+                            body: JSON.stringify({
+                                model: 'gpt-4o-mini',
+                                messages: [
+                                    { role: 'system', content: 'You are an elite Senior Legal Counsel. Draft complete, formal, court-ready legal documents in plain text.' },
+                                    { role: 'user', content: promptContext }
+                                ]
+                            })
+                        });
+                        const data = await res.json();
+                        generatedText = data?.choices?.[0]?.message?.content || '';
+                    }
+                } catch (err) {
+                    console.warn('API call failed, using Executive Legal Template fallback:', err);
+                }
+            }
+
+            // High-precision Executive Legal Fallback if no API key or network error
+            if (!generatedText) {
+                await new Promise(r => setTimeout(r, 650));
+                generatedText = buildExecutiveLegalDraft(activeData.title, mode);
+            }
+
+            document.getElementById('paper-heading').innerText = activeData.title.toUpperCase();
+            document.getElementById('paper-body').innerText = generatedText;
+
+            const outputSec = document.getElementById('output-section');
+            outputSec.classList.add('visible');
+            outputSec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+            btn.innerHTML = originalBtnHTML;
+            btn.disabled = false;
+            playSlideChime();
+        }
+
+        function buildExecutiveLegalDraft(docTitle, mode) {
+            const today = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+            if (mode === 'old_doc') {
+                const mod = document.getElementById('redraft-instructions').value || 'Updated for current statutory compliance';
+                const snippet = extractedOldDocText
+                    ? extractedOldDocText.substring(0, 500) + '...'
+                    : 'Previous executed instrument on record.';
+                return `THIS REDRAFTED & AMENDED ${docTitle.toUpperCase()} IS EXECUTED ON THIS ${today.toUpperCase()}\n\n` +
+                    `[Redrafted via ${selectedAI} Legal Intelligence Engine]\n\n` +
+                    `WHEREAS the parties previously executed a base instrument and now mutually desire to restate, amend, and supersede the prior terms with the following modifications:\n` +
+                    `• Applied Amendments: ${mod}\n\n` +
+                    `1. INCORPORATION & RESTATEMENT OF BASE CLAUSES\n` +
+                    `The foundational recitals from the uploaded instrument are hereby restated:\n"${snippet}"\n\n` +
+                    `2. OPERATIVE COVENANTS & STATUTORY COMPLIANCE\n` +
+                    `All financial covenants, notice periods, indemnity obligations, and dispute resolution clauses stand updated in accordance with prevailing Indian Contract Act, 1872 and applicable laws in force in 2026.\n\n` +
+                    `3. GOVERNING LAW & ARBITRATION\n` +
+                    `Any dispute arising out of this restated instrument shall be referred to a Sole Arbitrator under the Arbitration and Conciliation Act, 1996.\n\n` +
+                    `IN WITNESS WHEREOF, the Parties have set their hands on ${today}.\n\n` +
+                    `__________________________                      __________________________\n` +
+                    `FIRST PARTY SIGNATURE                           SECOND PARTY SIGNATURE`;
+            }
+
+            const p1 = document.getElementById('f_party1')?.value || '______________________';
+            const p2 = document.getElementById('f_party2')?.value || '______________________';
+            const prop = document.getElementById('f_prop')?.value || '______________________';
+            const amt = document.getElementById('f_amount')?.value || '______________________';
+            const terms = document.getElementById('f_terms')?.value || 'Standard statutory covenants applicable.';
+
+            return `THIS ${docTitle.toUpperCase()} IS MADE AND EXECUTED ON THIS ${today.toUpperCase()}\n\n` +
+                `BETWEEN:\n` +
+                `1. ${p1}, hereinafter referred to as the "FIRST PARTY" (which expression shall unless repugnant to the context include its heirs, successors, and permitted assigns).\n\n` +
+                `AND:\n` +
+                `2. ${p2}, hereinafter referred to as the "SECOND PARTY" (which expression shall unless repugnant to the context include its heirs, successors, and permitted assigns).\n\n` +
+                `WHEREAS:\n` +
+                `A. Subject Matter / Property / Forum: ${prop}\n` +
+                `B. Financial Consideration / Claim / Term: ${amt}\n\n` +
+                `NOW THIS INSTRUMENT WITNESSETH AS FOLLOWS:\n\n` +
+                `1. SCOPE & SPECIAL COVENANTS\n` +
+                `${terms}\n\n` +
+                `2. REPRESENTATIONS, INDEMNITY & OBLIGATIONS\n` +
+                `Both Parties represent that they have full legal capacity and authority to execute this ${docTitle}. Each Party agrees to indemnify and hold harmless the other against any direct breach of the covenants herein.\n\n` +
+                `3. TERMINATION & NOTICE\n` +
+                `Either Party may exercise termination or statutory remedies by serving a formal written notice as stipulated above.\n\n` +
+                `4. GOVERNING LAW & DISPUTE RESOLUTION\n` +
+                `This instrument shall be governed by the laws of India. The local courts shall have exclusive jurisdiction.\n\n` +
+                `IN WITNESS WHEREOF, the Parties hereto have signed this ${docTitle} on the day, month, and year first above written.\n\n\n` +
+                `__________________________                      __________________________\n` +
+                `FIRST PARTY (${p1})                             SECOND PARTY (${p2})\n\n` +
+                `WITNESS 1: ________________                     WITNESS 2: ________________`;
+        }
+
+        // --- EXPORT AS PDF ---
+        function exportDocumentAsPDF() {
+            playClickSound();
+            const element = document.getElementById('pdf-paper');
+            const docTitle = fullWheelItems[activeSegmentIndex].title.replace(/\s+/g, '_');
+
+            const opt = {
+                margin: [12, 12, 12, 12],
+                filename: `${docTitle}_Executive_Draft.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            html2pdf().set(opt).from(element).save();
+        }
+
+        function triggerSnorAI() {
+            playSlideChime();
+            openDocCreator();
+        }
+
+        renderWheel();
+    </script>
+</body>
+</html>
